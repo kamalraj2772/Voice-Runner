@@ -1,0 +1,57 @@
+import whisper
+import serial
+import sounddevice as sd
+import numpy as np
+import spacy
+import re
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
+nlp = spacy.load("en_core_web_sm")
+
+model = whisper.load_model("medium")
+
+try:
+    ser = serial.Serial('COM19', 9600, timeout=1) 
+    print("Serial connection established.")
+except serial.SerialException as e:
+    print(f"Serial error: {e}")
+    ser = None
+
+def record_audio(duration=3, samplerate=44100):
+    """Records audio from the microphone."""
+    print("Listening for command...")
+    audio = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=1, dtype=np.float32)
+    sd.wait()
+    return np.squeeze(audio)
+
+def extract_angle(text):
+    """Extracts an angle (0-180, in steps of 5) from natural language text."""
+    print(f"Recognized Text: {text}")
+
+    doc = nlp(text)
+    
+    numbers = [int(match.group()) for match in re.finditer(r"\b\d+\b", text)]
+    
+    for num in numbers:
+        if 0 <= num <= 180 and num % 5 == 0:  
+    
+    return None  
+
+while True:
+    audio_data = record_audio()
+
+    detected_lang = model.transcribe(audio_data)["language"]
+    print(f"Detected Language: {detected_lang}")
+
+    result = model.transcribe(audio_data, language=detected_lang)
+
+    angle = extract_angle(result["text"])
+
+    if angle is not None:
+        command = f"{angle}\n"  
+        print(f"Sending to Teensy: {command}")
+
+        if ser:
+            ser.write(command.encode())  
